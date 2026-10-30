@@ -25,11 +25,15 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Setup Gradle (with cache)
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Generate signing keystore
         working-directory: app/android
         run: |
+          mkdir -p app
           keytool -genkeypair -v \
-            -keystore release.jks \
+            -keystore app/release.jks \
             -storetype JKS \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -alias ghosten \
@@ -41,6 +45,7 @@ jobs:
           keyAlias=ghosten
           storeFile=release.jks
           EOF
+          ls -l app/release.jks key.properties
 
       - name: Flutter pub get
         working-directory: app
