@@ -1,0 +1,37 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// FIX flutter plugin install_plugin for Flutter 3.24
+subprojects {
+    afterEvaluate { project ->
+        if (project.group == "com.example.installplugin") {
+            project.android {
+                compileSdkVersion = 35
+                namespace = project.group
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_11
+                    targetCompatibility = JavaVersion.VERSION_11
+                }
+                kotlinOptions {
+                    jvmTarget = JavaVersion.VERSION_11
+                }
+            }
+        }
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.layout.buildDirectory
+}

@@ -1,0 +1,140 @@
+import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+
+group = "com.ghosten.api"
+version = "1.0-SNAPSHOT"
+
+buildscript {
+    ext.kotlin_version = "2.1.0"
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.7.3")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+android {
+    namespace = "com.ghosten.api"
+
+    compileSdk = 35
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11
+    }
+
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
+        test.java.srcDirs += "src/test/kotlin"
+    }
+
+    defaultConfig {
+        minSdk = 21
+    }
+
+    dependencies {
+        testImplementation("org.jetbrains.kotlin:kotlin-test")
+        testImplementation("org.mockito:mockito-core:5.0.0")
+    }
+
+    testOptions {
+        unitTests.all {
+            useJUnitPlatform()
+
+            testLogging {
+                events "passed", "skipped", "failed", "standardOut", "standardError"
+                outputs.upToDateWhen { false }
+                showStandardStreams = true
+            }
+        }
+    }
+
+    sourceSets {
+        main.jniLibs.srcDirs += "$buildDir/output/jni"
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: "$buildDir/output", include: ['*.jar'])
+}
+
+task downloadDependencies {
+    group = "build"
+
+    def dependencyName = "lib-api-release.aar"
+    def dependencyVersion = "v0.0.10"
+    def dependencySha256 = "8e186f2dff37949fffc7edaae2a6c0a1a23335aa4a4b6841ce104ba87c359d55"
+    def dependencyUrl = "https://github.com/GhostenEditor/Ghosten-Player-flutter-packages/releases/download/$dependencyVersion/$dependencyName"
+    def outputDir = file("$buildDir/output")
+    def destination = file("$buildDir/cache/$dependencyName")
+    if (outputDir.exists()) {
+        outputDir.deleteDir()
+    }
+    outputDir.mkdirs()
+
+    def destFile = destination
+    if (destFile.exists()) {
+        def calculatedSha256 = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(destFile.toPath())).encodeHex().toString()
+
+        if (calculatedSha256 != dependencySha256) {
+            destFile.delete()
+        }
+
+    }
+
+    if (!destFile.exists()) {
+        destFile.parentFile.mkdirs()
+        destFile.withOutputStream { os ->
+            os << new URL(dependencyUrl).openStream()
+        }
+
+        def calculatedSha256 = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(destFile.toPath())).encodeHex().toString()
+        if (calculatedSha256 != dependencySha256) {
+            throw new GradleException("MD5 verification failed for ${destFile}")
+        }
+    }
+
+    try {
+        def zipFile = new ZipFile(destFile)
+        zipFile.entries().each { entry ->
+            def outputFile = new File(outputDir, entry.name)
+
+            if (entry.isDirectory()) {
+                outputFile.mkdirs()
+            } else {
+                outputFile.parentFile.mkdirs()
+
+                zipFile.getInputStream(entry).withStream { input ->
+                    outputFile.withOutputStream { output ->
+                        output << input
+                    }
+                }
+            }
+        }
+        zipFile.close()
+
+    } catch (Exception e) {
+        throw new GradleException("Unzip failed: ${e.message}", e)
+    }
+}
+
+assemble.dependsOn(downloadDependencies)
